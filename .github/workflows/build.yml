@@ -1,0 +1,74 @@
+name: Build patch bundle
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "New bundle version (must be higher than the current one, e.g. 1.5.1)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Apply uploaded patch file (if any)
+        run: |
+          if [ -f maps-keepalive.patch ]; then
+            git apply maps-keepalive.patch
+            rm maps-keepalive.patch
+            echo "Applied maps-keepalive.patch"
+          fi
+
+      - name: Set version and point the bundle at this fork
+        env:
+          VERSION: ${{ inputs.version }}
+          REPO: ${{ github.repository }}
+        run: |
+          sed -i "s/^version = .*/version = $VERSION/" gradle.properties
+          CREATED=$(date -u +%Y-%m-%dT%H:%M:%S)
+          jq --arg v "$VERSION" \
+             --arg url "https://github.com/$REPO/releases/download/v$VERSION/patches-$VERSION.mpp" \
+             --arg at "$CREATED" \
+             '.version=$v | .download_url=$url | .created_at=$at | .signature_download_url=""' \
+             patches-bundle.json > tmp.json && mv tmp.json patches-bundle.json
+          cat patches-bundle.json
+
+      - name: Build
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.PACKAGES_TOKEN }}
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon --console=plain :patches:buildAndroid
+          find . -name "*.mpp" -not -path "./.git/*"
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          FILE=$(find patches/build -name "*.mpp" | head -n 1)
+          [ -n "$FILE" ] || { echo "No .mpp produced"; exit 1; }
+          cp "$FILE" "patches-$VERSION.mpp"
+          gh release create "v$VERSION" "patches-$VERSION.mpp" \
+            --title "v$VERSION" --notes "Fork build with MicroG-RE keep-alive"
+
+      - name: Commit patch, version and bundle info
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add -A
+          git reset -q -- "patches-$VERSION.mpp"
+          git commit -m "Build v$VERSION" && git push || echo "Nothing to commit"
