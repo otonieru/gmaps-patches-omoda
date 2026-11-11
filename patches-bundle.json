@@ -1,7 +1,7 @@
 {
-  "version": "1.5.0",
-  "download_url": "https://github.com/fangkampanat/gmaps-patches/releases/download/v1.5.0/patches-1.5.0.mpp",
-  "created_at": "2026-11-02T13:53:03",
+  "version": "1.5.1",
+  "download_url": "https://github.com/otonieru/gmaps-patches-omoda/releases/download/v1.5.1/patches-1.5.1.mpp",
+  "created_at": "2026-11-11T16:38:20",
   "description": "Use official MicroG-RE 7.3.0 for Google Maps and synthesized navigation speech, start Google TTS before guidance, skip the uncertified-device screen and avoid a crash when a location-settings dialog cannot open. Includes an opt-in Picture-in-picture setting in Maps Settings. Requires Morphe Desktop 1.19.0 or newer.",
   "signature_download_url": ""
 }
